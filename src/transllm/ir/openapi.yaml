@@ -1,0 +1,721 @@
+openapi: 3.0.3
+info:
+  title: TransLLM Intermediate Representation
+  version: 1.0.0
+  description: >
+    Brand-neutral Intermediate Representation (IR) specification for converting between
+    any two LLM API formats. Supports automatic multi-language SDK generation (50+ languages).
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  contact:
+    name: TransLLM
+    url: https://github.com/yourorg/transllm
+
+servers:
+  - url: https://api.transllm.dev/v1
+    description: TransLLM API Server
+
+paths: {}
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # ========== Core Data Types ==========
+
+    ContentBlockType:
+      type: string
+      enum: [text, image_url, tool_result, reasoning, thinking, redacted_thinking]
+
+    ImageDetailLevel:
+      type: string
+      enum: [high, low, auto]
+
+    RoleType:
+      type: string
+      enum: [system, user, assistant, tool]
+
+    ResponseRoleType:
+      type: string
+      enum: [assistant, tool]
+
+    ContentBlock:
+      type: object
+      description: Message content block supporting multiple content types
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, image_url, tool_result, reasoning, thinking, redacted_thinking]
+          description: Content block type
+        text:
+          type: string
+          description: Text content
+          nullable: true
+        image_url:
+          type: object
+          description: Image content
+          nullable: true
+          properties:
+            url:
+              type: string
+              description: Image URL or base64 data
+            detail:
+              type: string
+              enum: [high, low, auto]
+              description: Image processing detail level
+              nullable: true
+          additionalProperties: false
+        tool_result:
+          type: object
+          description: Tool execution result
+          nullable: true
+          properties:
+            tool_name:
+              type: string
+              description: Tool name
+            result:
+              type: object
+              description: Tool execution result data
+          additionalProperties: false
+        reasoning:
+          type: object
+          description: Reasoning content (thinking mode)
+          nullable: true
+          properties:
+            content:
+              type: string
+              description: Reasoning text
+          additionalProperties: false
+        thinking:
+          type: object
+          description: Thinking content (Anthropic extended thinking)
+          nullable: true
+          properties:
+            content:
+              type: string
+              description: Thinking text
+          additionalProperties: false
+        redacted_thinking:
+          type: object
+          description: Redacted thinking content (Anthropic extended thinking)
+          nullable: true
+          properties:
+            content:
+              type: string
+              description: Redacted thinking text
+          additionalProperties: false
+        cache_control:
+          type: object
+          description: Cache control metadata for prompt caching (Anthropic)
+          additionalProperties: true
+          nullable: true
+
+    Message:
+      type: object
+      description: Conversation message model
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+          description: Message sender role
+        content:
+          oneOf:
+            - type: string
+              description: Plain text content
+            - type: array
+              description: Multi-modal content blocks
+              items:
+                $ref: '#/components/schemas/ContentBlock'
+          description: Message content
+        metadata:
+          type: object
+          description: Additional metadata
+          additionalProperties: true
+          nullable: true
+        tool_calls:
+          type: array
+          description: Tool calls list
+          items:
+            $ref: '#/components/schemas/ToolCall'
+          nullable: true
+        identifier:
+          type: string
+          description: Message unique identifier
+          nullable: true
+        cache_control:
+          type: object
+          description: Cache control metadata for message-level caching (Anthropic)
+          additionalProperties: true
+          nullable: true
+
+    ToolDefinition:
+      type: object
+      description: Tool definition
+      required: [name, description]
+      properties:
+        name:
+          type: string
+          description: Tool name
+        description:
+          type: string
+          description: Tool functionality description
+        parameters:
+          type: object
+          description: JSON Schema format tool parameter definition
+        metadata:
+          type: object
+          description: Tool metadata
+          additionalProperties: true
+          nullable: true
+        cache_control:
+          type: object
+          description: Cache control metadata for tool definitions (Anthropic)
+          additionalProperties: true
+          nullable: true
+
+    ToolCall:
+      type: object
+      description: Tool call
+      required: [name, arguments]
+      properties:
+        identifier:
+          type: string
+          description: Tool call unique identifier
+        name:
+          type: string
+          description: Called tool name
+        arguments:
+          type: object
+          description: Tool call arguments
+
+    GenerationParameters:
+      type: object
+      description: Generation parameters configuration
+      properties:
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Controls output randomness
+          nullable: true
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: Maximum number of tokens to generate
+          nullable: true
+        max_completion_tokens:
+          type: integer
+          minimum: 1
+          description: Maximum tokens for completion (newer API version)
+          nullable: true
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Nucleus sampling parameter
+          nullable: true
+        top_k:
+          type: integer
+          minimum: 0
+          description: Top-K sampling parameter
+          nullable: true
+        stop_sequences:
+          type: array
+          description: Stop sequences
+          items:
+            type: string
+          nullable: true
+        stream:
+          type: boolean
+          description: Enable streaming output
+          nullable: true
+        seed:
+          type: integer
+          description: Random seed
+          nullable: true
+        presence_penalty:
+          type: number
+          description: Presence penalty coefficient
+          nullable: true
+        frequency_penalty:
+          type: number
+          description: Frequency penalty coefficient
+          nullable: true
+        logit_bias:
+          type: object
+          description: Modify token probability distribution (maps token IDs to bias values)
+          additionalProperties:
+            type: number
+          nullable: true
+        response_format:
+          type: object
+          description: Response format specification (e.g., JSON mode, schema)
+          additionalProperties: true
+          nullable: true
+        logprobs:
+          type: boolean
+          description: Return token log probabilities
+          nullable: true
+        top_logprobs:
+          type: integer
+          minimum: 0
+          description: Number of log probabilities to return
+          nullable: true
+        n:
+          type: integer
+          minimum: 1
+          description: Number of chat completion choices to generate
+          nullable: true
+        stream_options:
+          type: object
+          description: Streaming options (e.g., include_usage)
+          additionalProperties: true
+          nullable: true
+        metadata:
+          type: object
+          description: Generation parameters metadata
+          additionalProperties: true
+          nullable: true
+
+    GroundingAttribution:
+      type: object
+      description: Grounding attribution for responses with source citations
+      properties:
+        content_index:
+          type: integer
+          description: Content block index
+          nullable: true
+        model_decision:
+          type: string
+          description: Model decision text
+          nullable: true
+        grounding_chunk_indices:
+          type: array
+          description: Indices of grounding chunks
+          items:
+            type: integer
+          nullable: true
+        source_chunk_indices:
+          type: array
+          description: Indices of source chunks
+          items:
+            type: integer
+          nullable: true
+      additionalProperties: false
+
+    # ========== Request and Response Models ==========
+
+    CoreRequest:
+      type: object
+      description: Core request model (brand-neutral)
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: Model identifier
+        messages:
+          type: array
+          description: Conversation messages list
+          items:
+            $ref: '#/components/schemas/Message'
+        tools:
+          type: array
+          description: Available tool definitions list
+          items:
+            $ref: '#/components/schemas/ToolDefinition'
+          nullable: true
+        tool_choice:
+          oneOf:
+            - type: string
+              enum: [auto, none, any]
+            - type: object
+              description: Specify particular tool
+          description: Tool selection strategy
+          nullable: true
+        parallel_tool_calls:
+          type: boolean
+          description: Allow parallel execution of multiple tools
+          nullable: true
+        system_instruction:
+          type: string
+          description: System-level instruction (separate from messages list)
+          nullable: true
+        generation_params:
+          $ref: '#/components/schemas/GenerationParameters'
+        metadata:
+          type: object
+          description: Request metadata
+          additionalProperties: true
+          nullable: true
+
+    UsageStatistics:
+      type: object
+      description: Token usage statistics
+      required: [total_tokens]
+      properties:
+        prompt_tokens:
+          type: integer
+          description: Input token count
+          nullable: true
+        completion_tokens:
+          type: integer
+          description: Output token count
+          nullable: true
+        total_tokens:
+          type: integer
+          description: Total token count
+        input_tokens:
+          type: integer
+          description: Input token count (alias)
+          nullable: true
+        output_tokens:
+          type: integer
+          description: Output token count (alias)
+          nullable: true
+        cached_tokens:
+          type: integer
+          description: Cached token count
+          nullable: true
+        cache_creation_input_tokens:
+          type: integer
+          description: Input tokens used to create cache (Anthropic)
+          nullable: true
+        cache_read_input_tokens:
+          type: integer
+          description: Input tokens read from cache (Anthropic)
+          nullable: true
+        reasoning_tokens:
+          type: integer
+          description: Tokens used for reasoning/thinking (extended thinking models)
+          nullable: true
+
+    ResponseMessage:
+      type: object
+      description: Response message
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [assistant, tool]
+          description: Message sender role
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: '#/components/schemas/ContentBlock'
+          description: Message content
+        tool_calls:
+          type: array
+          description: Tool calls list
+          items:
+            $ref: '#/components/schemas/ToolCall'
+          nullable: true
+        reasoning_content:
+          type: string
+          description: Reasoning content from reasoning models (e.g., OpenAI o1)
+          nullable: true
+        thinking_blocks:
+          type: array
+          description: Structured thinking blocks from reasoning models
+          items:
+            type: object
+            additionalProperties: true
+          nullable: true
+        identifier:
+          type: string
+          description: Message unique identifier
+          nullable: true
+
+    FinishReason:
+      type: string
+      enum: [stop, length, content_filter, tool_calls, safety, recitation, other]
+
+    Choice:
+      type: object
+      description: Response choice
+      required: [message, index]
+      properties:
+        message:
+          $ref: '#/components/schemas/ResponseMessage'
+        index:
+          type: integer
+          description: Choice index
+        finish_reason:
+          type: string
+          enum: [stop, length, content_filter, tool_calls, safety, recitation, other]
+          description: Completion reason
+          nullable: true
+        logprobs:
+          type: object
+          description: Log probability information
+          nullable: true
+
+    CoreResponse:
+      type: object
+      description: Core response model (brand-neutral)
+      required: [choices]
+      properties:
+        id:
+          type: string
+          description: Response unique identifier
+          nullable: true
+        object:
+          type: string
+          description: Object type
+          default: "core.response"
+        created:
+          type: integer
+          description: Creation timestamp (Unix timestamp)
+          nullable: true
+        model:
+          type: string
+          description: Used model identifier
+        choices:
+          type: array
+          description: Response choices list
+          items:
+            $ref: '#/components/schemas/Choice'
+        usage:
+          $ref: '#/components/schemas/UsageStatistics'
+          nullable: true
+        grounding_attributions:
+          type: array
+          description: Grounding attributions for citations
+          items:
+            $ref: '#/components/schemas/GroundingAttribution'
+          nullable: true
+        metadata:
+          type: object
+          description: Response metadata
+          additionalProperties: true
+          nullable: true
+
+    # ========== Streaming Event Models ==========
+
+    StreamEventType:
+      type: string
+      enum:
+        - content_delta
+        - tool_call_delta
+        - content_finish
+        - stream_end
+        - error
+        - metadata_update
+
+    ToolCallDelta:
+      type: object
+      description: Tool call delta for streaming
+      properties:
+        name:
+          type: string
+          nullable: true
+        arguments_delta:
+          type: string
+          nullable: true
+        identifier:
+          type: string
+          nullable: true
+      additionalProperties: false
+
+    StreamEvent:
+      type: object
+      description: Streaming event
+      required: [type, sequence_id, timestamp]
+      properties:
+        type:
+          $ref: '#/components/schemas/StreamEventType'
+        sequence_id:
+          type: integer
+          description: Event sequence number (ensures ordering)
+        timestamp:
+          type: number
+          description: Event timestamp
+        content_delta:
+          type: string
+          description: Incremental content
+          nullable: true
+        tool_call_delta:
+          $ref: '#/components/schemas/ToolCallDelta'
+          nullable: true
+        tool_call:
+          type: array
+          description: Complete tool calls (when tool call is finished)
+          items:
+            $ref: '#/components/schemas/ToolCall'
+          nullable: true
+        finish_reason:
+          type: string
+          description: Completion reason
+          nullable: true
+        content_index:
+          type: integer
+          description: Content block index
+          nullable: true
+        error:
+          type: object
+          description: Error information
+          nullable: true
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+          additionalProperties: false
+        metadata:
+          type: object
+          description: Event metadata
+          additionalProperties: true
+          nullable: true
+
+    # ========== Error Models ==========
+
+    ErrorType:
+      type: string
+      enum: [validation_error, not_supported, conversion_error, internal_error]
+
+    ErrorDetail:
+      type: object
+      description: Error detail
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        type:
+          type: string
+          enum: [validation_error, not_supported, conversion_error, internal_error]
+          description: Error type
+        details:
+          type: object
+          description: Detailed error information
+          additionalProperties: true
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      description: Error response
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        request_id:
+          type: string
+          description: Request ID
+          nullable: true
+        timestamp:
+          type: number
+          description: Error occurrence timestamp
+          nullable: true
+
+    # ========== Provider Identifiers ==========
+
+    ProviderIdentifier:
+      type: string
+      description: Supported LLM providers
+      enum:
+        - openai
+        - anthropic
+        - gemini
+        - azure_openai
+        - aws_bedrock
+        - google_vertex_ai
+        - cohere
+        - huggingface
+        - vllm
+        - nvidia_nim
+        - together_ai
+        - fireworks_ai
+        - mistral
+        - groq
+
+  # ========== Example Data ==========
+
+  examples:
+    SimpleTextMessage:
+      summary: Simple text message
+      value:
+        role: user
+        content: "Hello, world!"
+
+    MultiModalMessage:
+      summary: Multi-modal message (text + image)
+      value:
+        role: user
+        content:
+          - type: text
+            text: "Describe this image"
+          - type: image_url
+            image_url:
+              url: "https://example.com/image.jpg"
+              detail: high
+
+    ToolCallMessage:
+      summary: Message with tool call
+      value:
+        role: assistant
+        tool_calls:
+          - identifier: "call_123"
+            name: "get_weather"
+            arguments:
+              location: "Beijing"
+
+    SimpleRequest:
+      summary: Simple request
+      value:
+        model: "gpt-4"
+        messages:
+          - role: user
+            content: "Hello"
+
+    ToolEnabledRequest:
+      summary: Tool-enabled request
+      value:
+        model: "claude-3-opus"
+        messages:
+          - role: user
+            content: "What's the weather today?"
+        tools:
+          - name: "get_weather"
+            description: "Get weather information for a specified location"
+            parameters:
+              type: object
+              properties:
+                location:
+                  type: string
+                  description: "Location name"
+                  example: "Beijing"
+              required: ["location"]
+
+    StreamResponse:
+      summary: Streaming response event
+      value:
+        - type: "content_delta"
+          sequence_id: 0
+          timestamp: 1234567890.123
+          content_delta: "Hello"
+
+    ErrorExample:
+      summary: Error response example
+      value:
+        error:
+          code: "UNSUPPORTED_FEATURE"
+          message: "Target provider does not support reasoning mode"
+          type: "not_supported"
+          details:
+            feature: "reasoning_mode"
+            provider: "gemini"
+        request_id: "req_123456"
+        timestamp: 1234567890.123

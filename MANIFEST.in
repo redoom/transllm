@@ -1,0 +1,38 @@
+# Include documentation and configuration files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+include MANIFEST.in
+
+# Include OpenAPI schema
+include src/transllm/ir/openapi.yaml
+
+# Include test fixtures
+recursive-include tests *.py
+recursive-include tests/fixtures *.json *.yaml
+
+# Include type stubs or additional data files
+recursive-include src *.py
+recursive-include src/transllm/adapters/gemini *.py
+recursive-include src/transllm/fixtures *.py
+
+# Exclude development and build artifacts
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude .coverage
+global-exclude htmlcov
+global-exclude .tox
+global-exclude build
+global-exclude dist
+global-exclude *.egg-info
+
+# Exclude IDE and version control
+global-exclude .gitignore
+global-exclude .gitmodules
+global-exclude .idea
+global-exclude .vscode
+global-exclude .DS_Store
+global-exclude Thumbs.db
