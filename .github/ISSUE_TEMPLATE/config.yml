@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+
+bug_report:
+  title: "[BUG] "
+  description: |
+    Report issues with conversion, format incompatibility, or other bugs.
+  labels: ["bug", "needs-triage"]
+  assignees: []
+
+feature_request:
+  title: "[FEATURE] "
+  description: |
+    Suggest new features, provider support, or improvements.
+  labels: ["enhancement", "needs-triage"]
+  assignees: []
+
+documentation:
+  title: "[DOCS] "
+  description: |
+    Improve API docs, examples, or usage guides.
+  labels: ["documentation", "needs-triage"]
+  assignees: []
