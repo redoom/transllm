@@ -226,18 +226,62 @@ def _normalize_provider(raw_provider: Any) -> Provider | None:
 
 def _detect_provider(request_body: dict[str, Any]) -> Provider | None:
     """Lightweight detection based on known request shapes."""
-    if "contents" in request_body:
+
+    if not isinstance(request_body, dict):
+        raise HTTPException(status_code=400, detail="request_body must be a dict")
+
+    keys = set(request_body.keys())
+    model = str(request_body.get("model", "") or "").strip().lower()
+
+    # gemini
+    if (
+        "contents" in keys
+        or "systemInstruction" in keys
+        or "generationConfig" in keys
+        or "safetySettings" in keys
+    ):
         return Provider.gemini
-    if "system" in request_body:
+    if "gemini" in model or "models/gemini" in model:
+        return Provider.gemini
+
+    # anthropic
+    if "anthropic_version" in keys or "stop_sequences" in keys:
         return Provider.anthropic
-    if "anthropic_version" in request_body or "stop_sequences" in request_body:
-        return Provider.anthropic
-    model = str(request_body.get("model", "")).lower()
     if "claude" in model or "anthropic" in model:
         return Provider.anthropic
-    if "messages" in request_body:
+
+    if "system" in keys and "messages" in keys:
+        openai_knobs = {
+            "frequency_penalty",
+            "presence_penalty",
+            "logit_bias",
+            "response_format",
+            "stream_options",
+            "seed",
+            "n",
+            "logprobs",
+            "top_logprobs",
+        }
+        if not (keys & openai_knobs):
+            return Provider.anthropic
+
+    # openai
+    if "input" in keys:
         return Provider.openai
-    return None
+    if "messages" in keys:
+        return Provider.openai
+    if "gpt" in model or model.startswith(("o1", "o3", "o4", "o5")) or "openai" in model:
+        return Provider.openai
+
+    # -------- Fail --------
+    sample = {k: request_body.get(k) for k in ("model", "messages", "system", "contents") if k in request_body}
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "Unable to detect provider. "
+            f"keys={sorted(keys)} model={model!r} sample={sample}"
+        ),
+    )
 
 
 def _build_config(
